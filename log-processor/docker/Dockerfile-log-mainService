@@ -1,0 +1,29 @@
+FROM ubuntu
+
+RUN apt-get update \
+    && apt-get install -y golang \
+    gcc \
+    bash \
+    tar \
+    gzip \
+    sudo \
+    tcpdump \
+    net-tools \
+    gdb \
+    vim \
+    file \
+    libssl-dev \
+    wget \
+    rpm \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+
+
+
+WORKDIR /app/bin/
+
+COPY ../log-mainService/bin/log-main-service.bin /app/bin/
+
+RUN chmod +x /app/bin/log-main-service.bin
+CMD ["./log-main-service.bin"]
