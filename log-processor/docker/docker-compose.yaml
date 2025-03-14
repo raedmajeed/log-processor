@@ -9,6 +9,8 @@ services:
         ipv4_address: 172.30.0.212
     ports:
       - "8082:8080"
+    env_file:
+      - ../.env
     # environment:
     #   SELF_CFG_PATH: "json/"
     #   ANLF_SVC_ADDR:

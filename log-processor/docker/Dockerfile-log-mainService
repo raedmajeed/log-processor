@@ -24,6 +24,7 @@ RUN apt-get update \
 WORKDIR /app/bin/
 
 COPY ../log-mainService/bin/log-main-service.bin /app/bin/
+COPY ../.env /app/
 
 RUN chmod +x /app/bin/log-main-service.bin
 CMD ["./log-main-service.bin"]
