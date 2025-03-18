@@ -1,33 +1,26 @@
-version: "3.0"
 services:
   service-log-main:
     restart: always
     image: log-main-service:v1
     container_name: log-main-service
-    networks:
-      log_net:
-        ipv4_address: 172.30.0.212
     ports:
       - "8082:8080"
     env_file:
       - ../.env
-    # environment:
-    #   SELF_CFG_PATH: "json/"
-    #   ANLF_SVC_ADDR:
-    #   OAUTH2_SUPPORT: "NO"
-    #   OPEN_HTTP_STD_PORT: "NO"
-    #   HTTPS_SUPPORT: "NO"
-    #   HTTP_READ_HEADER_TIMEOUT: "10"
-    # depends_on:
-    #   - service-postgres
-    #   - migrate
-    # volumes:
-    #   - /var/log/owe/:/var/log/owe/
-    # privileged: true
+    networks:
+      - default
+    depends_on:
+      - redis
+  redis:
+    restart: always
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6000:6379"
+    networks:
+      - default
+    environment:
+      - TZ=Asia/Kolkata
 networks:
-  log_net:
+  default:
     driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.30.0.0/24
