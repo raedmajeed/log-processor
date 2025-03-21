@@ -16,7 +16,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hibiken/asynq"
 	storage_go "github.com/supabase-community/storage-go"
 )
 
@@ -36,6 +35,7 @@ func HandleUploadFileToQueue(ctx *gin.Context) {
 		// token      string
 		// fileName   string
 		filePath string
+		fileSize int64
 	)
 
 	fileHeader, err = ctx.FormFile("log-file")
@@ -51,6 +51,7 @@ func HandleUploadFileToQueue(ctx *gin.Context) {
 		return
 	}
 	defer file.Close()
+	fileSize = fileHeader.Size
 
 	// token, err = extractToken(ctx)
 	// if err != nil {
@@ -67,8 +68,8 @@ func HandleUploadFileToQueue(ctx *gin.Context) {
 	filePath = uploadRsp.Key
 	fileId := "100"
 
-	task, _ := tasks.NewLogProcessTask(fileId, filePath)
-	taskInfo, err := types.AsynqClient.AsynqClient.Enqueue(task, asynq.MaxRetry(2))
+	task, _ := tasks.NewLogProcessTask(fileId, filePath, fileSize)
+	taskInfo, err := types.AsynqClient.AsynqClient.Enqueue(task)
 	if err != nil {
 		fmt.Println("errorrro", err)
 	}

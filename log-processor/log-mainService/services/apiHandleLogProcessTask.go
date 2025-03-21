@@ -21,7 +21,13 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 	payload := t.Payload()
 	var pay tasks.LogProcessPayload
 	json.Unmarshal(payload, &pay)
-	fmt.Println("PAYLOAD RECEIVED", pay)
+
+	queueName := "high"
+	if pay.FileSizeBytes > 1073741824 {
+		queueName = "low"
+	}
+
+	fmt.Println("PAYLOAD RECEIVED", pay, queueName)
 	// services.TesttingThis()
 	//* This function handles the workers responsible to stream the logs
 	return nil

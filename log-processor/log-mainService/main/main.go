@@ -141,11 +141,11 @@ func signalHandler(sigChan chan os.Signal) {
 func runMuxAsynqServer() {
 	srv := asynq.NewServer(asynq.RedisClientOpt{Addr: types.CmnGlblCfg.REDIS_ADDR},
 		asynq.Config{
-			Concurrency: 1,
-			// Queues: map[string]int{
-			// 	"high": 3,
-			// 	"low":  1,
-			// },
+			Concurrency: 4,
+			Queues: map[string]int{
+				"high": 3,
+				"low":  1,
+			},
 		})
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(tasks.TypeLogProcess, services.HandleAsyncTaskMethod)

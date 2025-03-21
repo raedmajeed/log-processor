@@ -18,8 +18,9 @@ const (
 )
 
 type LogProcessPayload struct {
-	FileId   string
-	FilePath string
+	FileId        string
+	FilePath      string
+	FileSizeBytes int64
 }
 
 /******************************************************************************
@@ -29,10 +30,18 @@ type LogProcessPayload struct {
 * INPUT:					 fileId, filePath
 * RETURNS:         *asynq.Task, error
 ******************************************************************************/
-func NewLogProcessTask(fileId, filePath string) (*asynq.Task, error) {
+func NewLogProcessTask(fileId, filePath string, fileSizeBytes int64) (*asynq.Task, error) {
 	var (
-		err error
+		err       error
+		queueName string
+		options   []asynq.Option
 	)
+
+	if fileSizeBytes > 1073741824 {
+		queueName = "low"
+	} else {
+		queueName = "high"
+	}
 
 	payload, err := json.Marshal(LogProcessPayload{
 		FileId:   fileId,
@@ -42,7 +51,13 @@ func NewLogProcessTask(fileId, filePath string) (*asynq.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	return asynq.NewTask(TypeLogProcess, payload), nil
+
+	options = []asynq.Option{
+		asynq.Queue(queueName),
+		asynq.MaxRetry(3),
+	}
+
+	return asynq.NewTask(TypeLogProcess, payload, options...), nil
 }
 
 // func HandleLogProcessTask(ctx context.Context, t *asynq.Task) error {
