@@ -56,6 +56,10 @@ func downloadFileFromSupeBaseStorage(filePath string) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("failed to download file, status: %d", resp.StatusCode)
+	}
+
 	return resp.Body, nil
 }

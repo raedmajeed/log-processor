@@ -45,14 +45,20 @@ func InitDbConnection() error {
  * INPUT:			query, whereEleList
  * RETURNS:    		outData, err
  ******************************************************************************/
-func ExecQueryDB(query string, queryParams interface{}) (err error) {
+func ExecQueryDB(query string, queryParams interface{}) (int64, error) {
 	con := types.Db.DbConn
 
-	_, err = con.Exec(query, queryParams)
+	sqlStmnt, err := con.Prepare(query)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return err
+	res, err := sqlStmnt.Exec(query, queryParams)
+	if err != nil {
+		return 0, err
+	}
+	lastId, err := res.LastInsertId()
+
+	return lastId, err
 }
 
 /******************************************************************************
@@ -126,14 +132,14 @@ func AddMultipleRecordInDB(tableName string, data []map[string]interface{}) (err
  * INPUT:
  * RETURNS:    		err, rows
  ******************************************************************************/
-func UpdateDataInDB(query string, whereEleList []interface{}) (err error, rows int64) {
+func UpdateDataInDB(query string, whereEleList []interface{}) (rows int64, err error) {
 
 	rows = 0
 	con := types.Db.DbConn
 
 	stmtIns, err := con.Prepare(query)
 	if err != nil {
-		return err, rows
+		return rows, err
 	}
 
 	if stmtIns != nil {
@@ -142,11 +148,11 @@ func UpdateDataInDB(query string, whereEleList []interface{}) (err error, rows i
 
 	res, err := stmtIns.Exec(whereEleList...)
 	if err != nil {
-		return err, rows
+		return rows, err
 	}
 
 	rows, err = res.RowsAffected()
-	return err, rows
+	return rows, err
 }
 
 /******************************************************************************
@@ -205,4 +211,87 @@ func GetDataFromDB(query string, queryParams []interface{}) (results []map[strin
 	}
 
 	return results, nil
+}
+
+/****************************************************************************
+ * FUNCTION: InsertAndReturnID
+ * DESCRIPTION: Inserts a record into the specified table and returns the generated ID
+ * INPUT: tableName, data
+ * RETURNS: insertedID, err
+ *****************************************************************************/
+func InsertAndReturnID(tableName string, data map[string]interface{}) (int64, error) {
+	if len(data) == 0 {
+		return 0, errors.New("empty data received")
+	}
+
+	con := types.Db.DbConn
+
+	keys := make([]string, 0, len(data))
+	values := make([]interface{}, 0, len(data))
+	placeholders := make([]string, 0, len(data))
+
+	for key, _ := range data {
+		keys = append(keys, key)
+		values = append(values, data[key])
+		placeholders = append(placeholders, fmt.Sprintf("$%d", len(placeholders)+1))
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) RETURNING file_id", tableName, strings.Join(keys, ", "), strings.Join(placeholders, ", "))
+
+	var insertedID int64
+	err := con.QueryRow(query, values...).Scan(&insertedID)
+	if err != nil {
+		return 0, err
+	}
+
+	return insertedID, nil
+}
+
+/****************************************************************************
+ * FUNCTION: UpdateSingleRecord
+ * DESCRIPTION: Inserts a record into the specified table and returns the generated ID
+ * INPUT: tableName, data
+ * RETURNS: insertedID, err
+ *****************************************************************************/
+func UpdateSingleRecord(tableName, whereKey string, recordID int64, data map[string]interface{}) error {
+	if len(data) == 0 {
+		return fmt.Errorf("no update data provided")
+	}
+
+	con := types.Db.DbConn
+	setClauses := make([]string, 0, len(data))
+	values := make([]interface{}, 0, len(data)+1)
+
+	i := 1
+	for column, value := range data {
+		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", column, i))
+		values = append(values, value)
+		i++
+	}
+
+	values = append(values, recordID)
+
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s WHERE %s = $%d",
+		tableName,
+		strings.Join(setClauses, ", "),
+		whereKey,
+		i,
+	)
+
+	result, err := con.Exec(query, values...)
+	if err != nil {
+		return fmt.Errorf("error executing update: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error getting rows affected: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no record found with ID %d in table %s", recordID, tableName)
+	}
+
+	return nil
 }

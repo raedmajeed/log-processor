@@ -9,6 +9,7 @@ package services
 import (
 	"LOGProcessor/shared/types"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -32,11 +33,12 @@ func JwtTokenCreatorForSupebaseStorage(filePath string) (token string, err error
 	}
 
 	unsignedToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	token, err = unsignedToken.SignedString(types.CmnGlblCfg.JWT_SECRET)
+	token, err = unsignedToken.SignedString([]byte(types.CmnGlblCfg.JWT_SECRET))
 
 	if err != nil {
 		return "", err
 	}
+
 	return token, nil
 }
 
@@ -61,15 +63,15 @@ func ConfigSupeBaseStorageClient(authToken string) *storage.Client {
 * INPUT:           ctx *gin.Context
 * RETURNS:         string (token), error (if missing)
 ******************************************************************************/
-func extractToken(ctx *gin.Context) (string, error) {
-	tokenInt, exists := ctx.Get("token")
+func extractToken(ctx *gin.Context, key string) (string, error) {
+	tokenInt, exists := ctx.Get(key)
 	if !exists {
-		return "", fmt.Errorf("token not found")
+		return "", fmt.Errorf("key not found")
 	}
 
 	token, ok := tokenInt.(string)
 	if !ok {
-		return "", fmt.Errorf("invalid token format")
+		return "", fmt.Errorf("invalid key format")
 	}
 
 	return token, nil
@@ -91,4 +93,18 @@ func SendResponse(ctx *gin.Context, statusCode int, message string, data types.D
 	}
 
 	ctx.JSON(statusCode, response)
+}
+
+/******************************************************************************
+ * FUNCTION: ConvertToKeywordList
+ * DESCRIPTION: function to convert string to list seperated by ','
+ * INPUT: string
+ * RETURNS: []string
+ ******************************************************************************/
+func ConvertToKeywordList(input string) []string {
+	keywords := strings.Split(input, ",")
+	for i := range keywords {
+		keywords[i] = strings.TrimSpace(keywords[i])
+	}
+	return keywords
 }

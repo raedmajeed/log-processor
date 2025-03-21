@@ -17,4 +17,5 @@ type SvcConfig struct {
 	DB_PORT               string
 	DB_HOST               string
 	REDIS_ADDR            string
+	KEYWORD_CONFIG        string
 }

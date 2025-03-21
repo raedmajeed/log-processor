@@ -53,6 +53,7 @@ func loadEnvVariables() {
 	types.CmnGlblCfg.DB_PORT = getEnv("DB_PORT", "0001")
 	types.CmnGlblCfg.DB_HOST = getEnv("DB_HOST", "0001")
 	types.CmnGlblCfg.REDIS_ADDR = getEnv("REDIS_ADDR", "0001")
+	types.CmnGlblCfg.KEYWORD_CONFIG = getEnv("KEYWORD_CONFIG", "0001")
 }
 
 func getEnv(key, defaultValue string) string {
