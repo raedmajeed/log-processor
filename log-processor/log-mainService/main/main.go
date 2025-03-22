@@ -9,10 +9,12 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"github.com/hibiken/asynq"
+	"golang.org/x/time/rate"
 )
 
 /******************************************************************************
@@ -27,6 +29,7 @@ func main() {
 	router := createNewRouter()
 	go router.Run(":" + types.CmnGlblCfg.RUNNING_PORT)
 	go runMuxAsynqServer()
+	initRateLimitOptions()
 
 	go signalHandler(sigChan)
 	err := <-types.ExitChan
@@ -45,10 +48,33 @@ func main() {
 func createNewRouter() *gin.Engine {
 	r := gin.Default()
 
+	if types.RateLimit.Enabled {
+		r.Use(services.GlobalRateLimit(rate.Limit(types.RateLimit.GlobalLimit), types.RateLimit.GlobalBurst))
+	}
+
+	ipLimitOpts := types.IPRateLimitOptions{
+		ClientTimeout: 5 * time.Minute,
+	}
+	ipRateLimiter := services.NewRateLimiterMiddleware(rate.Limit(types.RateLimit.PerIPLimit), types.RateLimit.PerIPBurst, ipLimitOpts)
+	r.Use(ipRateLimiter.RateLimit())
+
 	for _, route := range apiRoutes {
+		routeHandlers := []gin.HandlerFunc{}
+
 		if route.IsAuthReq {
 			r.Use(AuthMiddleware)
 		}
+
+		if route.UseRateLimit {
+			routeHandlers = append(routeHandlers, services.RouteSpecificRateLimit(
+				route.Pattern,
+				rate.Limit(route.RateLimitPerSec),
+				route.RateLimitBurst,
+			))
+		}
+
+		routeHandlers = append(routeHandlers, route.Handler)
+
 		endpoint := baseUrl + route.Pattern
 		switch route.Method {
 		case "GET":
@@ -150,4 +176,27 @@ func runMuxAsynqServer() {
 		fmt.Println("ERR", err)
 	}
 	srv.Shutdown()
+}
+
+/******************************************************************************
+* FUNCTION:        initRateLimitOptions
+* DESCRIPTION:     Initialize rate limit options
+* INPUT:           None
+* RETURNS:         VOID
+******************************************************************************/
+
+func initRateLimitOptions() {
+	types.RateLimit = types.RateLimitConfig{
+		Enabled:     true,
+		GlobalLimit: 100,
+		GlobalBurst: 200,
+		PerIPLimit:  10,
+		PerIPBurst:  20,
+		PerRouteOpts: map[string]types.PerRouteLimit{
+			"/upload-logs": {
+				Limit: 5,
+				Burst: 10,
+			},
+		},
+	}
 }
