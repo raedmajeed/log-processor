@@ -45,7 +45,6 @@ func init() {
 	var (
 		err error
 	)
-	//* SET UP Logging conf
 
 	loadEnvVariables()
 	err = db.InitDbConnection()
