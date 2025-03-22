@@ -39,6 +39,12 @@ var apiRoutes = types.ApiRoutes{
 		Handler:   services.HandleGetStatsByJobId,
 		IsAuthReq: true,
 	},
+	{
+		Method:    "GET",
+		Pattern:   "/live-stats",
+		Handler:   services.WebSocketHandler,
+		IsAuthReq: true,
+	},
 }
 
 func init() {
@@ -93,4 +99,14 @@ func getEnv(key, defaultValue string) string {
 func createAsynqRedisClient() {
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: types.CmnGlblCfg.REDIS_ADDR})
 	types.AsynqClient.AsynqClient = asynqClient
+}
+
+/******************************************************************************
+* FUNCTION:        loadEnvVariables
+* DESCRIPTION:     Function to load env variables and assign to global variables
+* INPUT:           None
+* RETURNS:         VOID
+******************************************************************************/
+func InitInspector(redisAddr string) {
+	types.AsynqClient.AsynqInspector = asynq.NewInspector(asynq.RedisClientOpt{Addr: redisAddr})
 }

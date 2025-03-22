@@ -35,7 +35,8 @@ type DbHandler struct {
 }
 
 type AsynqHdlr struct {
-	AsynqClient *asynq.Client
+	AsynqClient    *asynq.Client
+	AsynqInspector *asynq.Inspector
 }
 
 type ApiRoutes []ServiceApiRoute

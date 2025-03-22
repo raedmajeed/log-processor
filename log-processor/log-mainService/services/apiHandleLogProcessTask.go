@@ -15,11 +15,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/martian/log"
 	"github.com/hibiken/asynq"
 )
 
 const (
 	MAX_CHUNKS = 1
+)
+
+var (
+	inspector = types.AsynqClient.AsynqInspector
 )
 
 type FileChunk struct {
@@ -54,7 +59,6 @@ var logLineRegex = regexp.MustCompile(`\[(.*?)\]\s+(\w+)\s+(.*)`)
 var ipRegex = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
 var keywordList = ConvertToKeywordList(types.CmnGlblCfg.KEYWORD_CONFIG)
 
-
 /******************************************************************************
 * FUNCTION:        HandleUploadFileToQueue
 *
@@ -67,33 +71,56 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 		err           error
 		logStats      *LogStats
 		fileSizeBytes int64
+		queueName     string
+		errorMsg      string
 	)
+
 	payload := t.Payload()
 	var pay tasks.LogProcessPayload
 	json.Unmarshal(payload, &pay)
 	startTime := time.Now()
 
+	taskID := t.ResultWriter().TaskID()
+
+	if fileSizeBytes > 1073741824 {
+		queueName = "high"
+	} else {
+		queueName = "low"
+	}
+
+	taskInfo, inspErr := inspector.GetTaskInfo(queueName, taskID)
+	if inspErr == nil && taskInfo.Retried < 1 {
+		BroadcastMessage(fmt.Sprintf("Job %s active", taskID))
+	}
+
+	defer func() {
+		if err != nil {
+			taskInfo, inspErr := inspector.GetTaskInfo(queueName, taskID)
+			if inspErr == nil && taskInfo.Retried == 3 {
+				updateFileStats(pay.FileId, "Failed", startTime, 0,
+					fmt.Sprintf("task permanently failed after max retries: %v", errorMsg))
+			}
+			BroadcastMessage(fmt.Sprintf("Job %s failed", taskID))
+		}
+	}()
+
 	dbConn := types.Db.DbConn
 	tx, err := dbConn.BeginTx(ctx, nil)
 	if err != nil {
-		updateFileStats(pay.FileId, "Failed", startTime, 0, fmt.Sprintf("failed to start transaction: %v", err))
 		return fmt.Errorf("failed to start transaction: %v", err)
 	}
 
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
-			errorMsg := fmt.Sprintf("panic occurred during processing: %v", r)
-			updateFileStats(pay.FileId, "Failed", startTime, 0, errorMsg)
-			fmt.Println(errorMsg)
+			errorMsg = fmt.Sprintf("panic occurred during processing: %v", r)
 		} else if err != nil {
 			tx.Rollback()
-			updateFileStats(pay.FileId, "Failed", startTime, 0, fmt.Sprintf("error during processing: %v", err))
-			fmt.Println("Transaction rolled back due to error:", err)
+			log.Errorf("Transaction rolled back due to error: %v", err)
 		}
 	}()
 
-	if fileSizeBytes < 1073741824 {
+	if fileSizeBytes > 1073741824 {
 		logStats, err = processLargeLogFile(ctx, pay.FilePath, pay.FileId, pay.FileSizeBytes)
 	} else {
 		logStats, err = processLogFile(ctx, pay.FilePath, pay.FileId)
@@ -114,8 +141,9 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 
 	keywordJSON, _ := json.Marshal(logStats.KeywordCounts)
 	updateFileStats(pay.FileId, "Completed", startTime, logStats.ErrorCount, "", string(keywordJSON))
-
 	fmt.Println("Log processing completed successfully", logStats)
+	BroadcastMessage(fmt.Sprintf("Job %s completed", taskID))
+
 	return nil
 }
 
