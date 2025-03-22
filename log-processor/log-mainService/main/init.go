@@ -10,11 +10,33 @@ import (
 	_ "github.com/lib/pq"
 )
 
+const (
+	baseUrl = "api/"
+)
+
 var apiRoutes = types.ApiRoutes{
 	{
 		Method:    "GET",
 		Pattern:   "/upload-logs",
 		Handler:   services.HandleUploadFileToQueue,
+		IsAuthReq: true,
+	},
+	{
+		Method:    "GET",
+		Pattern:   "/queue-status",
+		Handler:   services.HandleGetQueueCurrentStatus,
+		IsAuthReq: false,
+	},
+	{
+		Method:    "GET",
+		Pattern:   "/stats",
+		Handler:   services.HandleGetAggregatedTasks,
+		IsAuthReq: true,
+	},
+	{
+		Method:    "GET",
+		Pattern:   "/stats/:jobId",
+		Handler:   services.HandleGetStatsByJobId,
 		IsAuthReq: true,
 	},
 }

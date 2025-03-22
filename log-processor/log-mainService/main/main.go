@@ -15,10 +15,6 @@ import (
 	"github.com/hibiken/asynq"
 )
 
-const (
-	baseUrl = "api/"
-)
-
 /******************************************************************************
 * FUNCTION:        main
 * DESCRIPTION:     Entry point for the application. Starts the Gin router and
