@@ -67,8 +67,10 @@ func ExecQueryDB(query string, queryParams interface{}) (int64, error) {
  * INPUT:			tableName, data
  * RETURNS:    		err
  ******************************************************************************/
-func AddMultipleRecordInDB(tableName string, data []map[string]interface{}) (err error) {
-
+func AddMultipleRecordInDB(tx *sql.Tx, tableName string, data []map[string]interface{}) error {
+	var (
+		err error
+	)
 	if len(data) == 0 {
 		return errors.New("empty data received")
 	}
@@ -112,18 +114,31 @@ func AddMultipleRecordInDB(tableName string, data []map[string]interface{}) (err
 
 	query := fmt.Sprintf("INSERT INTO %v (%v) VALUES %v", tableName, col, strings.Join(placeholders, ", "))
 
-	stmtIns, err := con.Prepare(query)
-	if err != nil {
-		return err
-	}
-	defer stmtIns.Close()
+	if tx != nil {
+		stmtIns, err := tx.Prepare(query)
+		if err != nil {
+			return err
+		}
+		defer stmtIns.Close()
 
-	_, err = stmtIns.Exec(dataList...)
-	if err != nil {
-		return err
+		_, err = stmtIns.Exec(dataList...)
+		if err != nil {
+			return err
+		}
+	} else {
+		stmtIns, err := con.Prepare(query)
+		if err != nil {
+			return err
+		}
+		defer stmtIns.Close()
+
+		_, err = stmtIns.Exec(dataList...)
+		if err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return err
 }
 
 /******************************************************************************
@@ -132,26 +147,39 @@ func AddMultipleRecordInDB(tableName string, data []map[string]interface{}) (err
  * INPUT:
  * RETURNS:    		err, rows
  ******************************************************************************/
-func UpdateDataInDB(query string, whereEleList []interface{}) (rows int64, err error) {
+func UpdateDataInDB(tx *sql.Tx, query string, whereEleList []interface{}) (rows int64, err error) {
 
 	rows = 0
 	con := types.Db.DbConn
 
-	stmtIns, err := con.Prepare(query)
-	if err != nil {
-		return rows, err
+	if tx != nil {
+		stmtIns, err := tx.Prepare(query)
+		if err != nil {
+			return rows, err
+		}
+		if stmtIns != nil {
+			defer stmtIns.Close()
+		}
+		res, err := stmtIns.Exec(whereEleList...)
+		if err != nil {
+			return rows, err
+		}
+		rows, err = res.RowsAffected()
+	} else {
+		stmtIns, err := con.Prepare(query)
+		if err != nil {
+			return rows, err
+		}
+		if stmtIns != nil {
+			defer stmtIns.Close()
+		}
+		res, err := stmtIns.Exec(whereEleList...)
+		if err != nil {
+			return rows, err
+		}
+		rows, err = res.RowsAffected()
 	}
 
-	if stmtIns != nil {
-		defer stmtIns.Close()
-	}
-
-	res, err := stmtIns.Exec(whereEleList...)
-	if err != nil {
-		return rows, err
-	}
-
-	rows, err = res.RowsAffected()
 	return rows, err
 }
 
@@ -219,7 +247,7 @@ func GetDataFromDB(query string, queryParams []interface{}) (results []map[strin
  * INPUT: tableName, data
  * RETURNS: insertedID, err
  *****************************************************************************/
-func InsertAndReturnID(tableName string, data map[string]interface{}) (int64, error) {
+func InsertAndReturnID(tx *sql.Tx, tableName string, data map[string]interface{}) (int64, error) {
 	if len(data) == 0 {
 		return 0, errors.New("empty data received")
 	}
@@ -239,9 +267,17 @@ func InsertAndReturnID(tableName string, data map[string]interface{}) (int64, er
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) RETURNING file_id", tableName, strings.Join(keys, ", "), strings.Join(placeholders, ", "))
 
 	var insertedID int64
-	err := con.QueryRow(query, values...).Scan(&insertedID)
-	if err != nil {
-		return 0, err
+
+	if tx != nil {
+		err := tx.QueryRow(query, values...).Scan(&insertedID)
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		err := con.QueryRow(query, values...).Scan(&insertedID)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	return insertedID, nil
@@ -253,7 +289,7 @@ func InsertAndReturnID(tableName string, data map[string]interface{}) (int64, er
  * INPUT: tableName, data
  * RETURNS: insertedID, err
  *****************************************************************************/
-func UpdateSingleRecord(tableName, whereKey string, recordID int64, data map[string]interface{}) error {
+func UpdateSingleRecord(tx *sql.Tx, tableName, whereKey string, recordID int64, data map[string]interface{}) error {
 	if len(data) == 0 {
 		return fmt.Errorf("no update data provided")
 	}
@@ -279,14 +315,25 @@ func UpdateSingleRecord(tableName, whereKey string, recordID int64, data map[str
 		i,
 	)
 
-	result, err := con.Exec(query, values...)
-	if err != nil {
-		return fmt.Errorf("error executing update: %v", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("error getting rows affected: %v", err)
+	var rowsAffected int64
+	if tx != nil {
+		result, err := tx.Exec(query, values...)
+		if err != nil {
+			return fmt.Errorf("error executing update: %v", err)
+		}
+		rowsAffected, err = result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("error getting rows affected: %v", err)
+		}
+	} else {
+		result, err := con.Exec(query, values...)
+		if err != nil {
+			return fmt.Errorf("error executing update: %v", err)
+		}
+		rowsAffected, err = result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("error getting rows affected: %v", err)
+		}
 	}
 
 	if rowsAffected == 0 {

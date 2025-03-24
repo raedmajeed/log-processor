@@ -62,7 +62,3 @@ func NewLogProcessTask(filePath, userId string, fileId int64, fileSizeBytes int6
 
 	return asynq.NewTask(TypeLogProcess, payload, options...), nil
 }
-
-// func HandleLogProcessTask(ctx context.Context, t *asynq.Task) error {
-
-// }

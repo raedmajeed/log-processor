@@ -9,11 +9,13 @@ package services
 import (
 	"LOGProcessor/shared/types"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"github.com/google/martian/log"
 	storage "github.com/supabase-community/storage-go"
 )
 
@@ -107,4 +109,18 @@ func ConvertToKeywordList(input string) []string {
 		keywords[i] = strings.TrimSpace(keywords[i])
 	}
 	return keywords
+}
+
+/******************************************************************************
+ * FUNCTION: PanicRecovery
+ * DESCRIPTION: function to be called at begining of all function
+ * INPUT: function name and error
+ * RETURNS: void
+ ******************************************************************************/
+func PanicRecovery(funcName string) {
+	if r := recover(); r != nil {
+		log.Errorf("recovered from panic, function: %s;err: %v \nStacktrace: %s", funcName, r, string(debug.Stack()))
+	}
+	return
+
 }

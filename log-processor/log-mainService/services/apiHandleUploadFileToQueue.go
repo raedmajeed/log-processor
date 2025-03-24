@@ -29,6 +29,8 @@ import (
 * RETURNS:         void
 ******************************************************************************/
 func HandleUploadFileToQueue(ctx *gin.Context) {
+	defer PanicRecovery("HandleUploadFileToQueue")
+
 	var (
 		err        error
 		fileHeader *multipart.FileHeader
@@ -105,7 +107,7 @@ func HandleUploadFileToQueue(ctx *gin.Context) {
 		}
 	}()
 
-	fileId, err = db.InsertAndReturnID("file_stats", data)
+	fileId, err = db.InsertAndReturnID(tx, "file_stats", data)
 	if err != nil {
 		log.Errorf("failed to insert into file_stats; err: %v", err)
 		SendResponse(ctx, http.StatusInternalServerError, "internal server error", "", 0)
@@ -120,7 +122,7 @@ func HandleUploadFileToQueue(ctx *gin.Context) {
 		return
 	}
 
-	_, err = db.UpdateDataInDB("UPDATE file_stats SET job_id = $1 WHERE file_id = $2", []interface{}{taskInfo.ID, fileId})
+	_, err = db.UpdateDataInDB(tx, "UPDATE file_stats SET job_id = $1 WHERE file_id = $2", []interface{}{taskInfo.ID, fileId})
 	if err != nil {
 		log.Errorf("failed to update job_id; err: %v", err)
 		SendResponse(ctx, http.StatusBadRequest, "internal server error", "", 0)

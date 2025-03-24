@@ -6,6 +6,7 @@ import (
 	"LOGProcessor/shared/types"
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -65,6 +66,8 @@ type LogStats struct {
 * RETURNS:         void
 ******************************************************************************/
 func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
+	defer PanicRecovery("HandleAsyncTaskMethod")
+
 	var (
 		err           error
 		logStats      *LogStats
@@ -94,7 +97,7 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 		if err != nil {
 			if inspErr == nil && taskInfo.Retried == (taskInfo.MaxRetry-1) {
 				BroadcastMessage(fmt.Sprintf("Job %s failed", taskID), "job-update", pay.UserId)
-				data, _ := updateFileStats(pay.FileId, "Failed", startTime, 0,
+				data, _ := updateFileStats(nil, pay.FileId, "Failed", startTime, 0,
 					fmt.Sprintf("task permanently failed after max retries: %v", err))
 				data["file_id"] = pay.FileId
 				BroadcastMessage(data, "log-table-update", pay.UserId)
@@ -127,18 +130,18 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 		}
 	}
 
-	err = insertLogEntries(ctx, logStats.LogEntries)
+	err = insertLogEntries(tx, ctx, logStats.LogEntries)
 	if err != nil {
 		return fmt.Errorf("error inserting log entries: %v", err)
 	}
+
+	keywordJSON, _ := json.Marshal(logStats.KeywordCounts)
+	data, _ := updateFileStats(tx, pay.FileId, "Completed", startTime, logStats.ErrorCount, "", string(keywordJSON))
 
 	err = tx.Commit()
 	if err != nil {
 		return fmt.Errorf("failed to commit transaction: %v", err)
 	}
-
-	keywordJSON, _ := json.Marshal(logStats.KeywordCounts)
-	data, _ := updateFileStats(pay.FileId, "Completed", startTime, logStats.ErrorCount, "", string(keywordJSON))
 	data["file_id"] = pay.FileId
 	BroadcastMessage(data, "log-table-update", pay.UserId)
 	BroadcastMessage(fmt.Sprintf("Job %s completed", taskID), "job-update", pay.UserId)
@@ -154,6 +157,7 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 * RETURNS:         void
 ******************************************************************************/
 func processLogFile(ctx context.Context, filePath string, fileID int64) (*LogStats, error) {
+	defer PanicRecovery("processLogFile")
 
 	fileContent, err := downloadFileFromSupeBaseStorage(filePath)
 	if err != nil {
@@ -215,6 +219,8 @@ func processLogFile(ctx context.Context, filePath string, fileID int64) (*LogSta
 * RETURNS:         void
 ******************************************************************************/
 func parseLogLine(line string, fileID int64) (LogEntry, bool) {
+	defer PanicRecovery("parseLogLine")
+
 	matches := logLineRegex.FindStringSubmatch(line)
 	if len(matches) < 4 {
 		return LogEntry{}, false
@@ -279,7 +285,9 @@ func parseLogLine(line string, fileID int64) (LogEntry, bool) {
 * INPUT:					 gin context
 * RETURNS:         void
 ******************************************************************************/
-func insertLogEntries(ctx context.Context, entries []LogEntry) error {
+func insertLogEntries(tx *sql.Tx, ctx context.Context, entries []LogEntry) error {
+	defer PanicRecovery("insertLogEntries")
+
 	if len(entries) == 0 {
 		return nil
 	}
@@ -306,7 +314,7 @@ func insertLogEntries(ctx context.Context, entries []LogEntry) error {
 		}
 
 		batch := logData[i:end]
-		err := db.AddMultipleRecordInDB("log_stats", batch)
+		err := db.AddMultipleRecordInDB(tx, "log_stats", batch)
 		if err != nil {
 			return fmt.Errorf("error inserting log batch: %v", err)
 		}
@@ -323,6 +331,7 @@ func insertLogEntries(ctx context.Context, entries []LogEntry) error {
 * RETURNS:         LogStats, error
 ******************************************************************************/
 func processLargeLogFile(ctx context.Context, filePath string, fileID int64, fileSize int64) (*LogStats, error) {
+	defer PanicRecovery("processLargeLogFile")
 
 	fileContent, err := downloadFileFromSupeBaseStorage(filePath)
 	if err != nil {
@@ -413,6 +422,8 @@ func processLargeLogFile(ctx context.Context, filePath string, fileID int64, fil
 * RETURNS:         Log entries, error
 ******************************************************************************/
 func processFileChunk(file *os.File, chunk FileChunk, fileID int64) ([]LogEntry, KeywordStats, int, error) {
+	defer PanicRecovery("processFileChunk")
+
 	_, err := file.Seek(chunk.StartOffset, 0)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("error seeking to chunk start: %v", err)
@@ -467,7 +478,9 @@ func processFileChunk(file *os.File, chunk FileChunk, fileID int64) ([]LogEntry,
 * INPUT:           fileID, status, startTime, errorCount, failureReason, keywordJSON
 * RETURNS:         error
 ******************************************************************************/
-func updateFileStats(fileID int64, status string, startTime time.Time, errorCount int, failureReason string, keywordJSON ...string) (map[string]interface{}, error) {
+func updateFileStats(tx *sql.Tx, fileID int64, status string, startTime time.Time, errorCount int, failureReason string, keywordJSON ...string) (map[string]interface{}, error) {
+	defer PanicRecovery("updateFileStats")
+
 	endTime := time.Now()
 	processingTimeSec := endTime.Sub(startTime).Seconds()
 
@@ -487,7 +500,7 @@ func updateFileStats(fileID int64, status string, startTime time.Time, errorCoun
 		data["keyword_stats"] = keywordJSON[0]
 	}
 
-	err := db.UpdateSingleRecord("file_stats", "file_id", fileID, data)
+	err := db.UpdateSingleRecord(tx, "file_stats", "file_id", fileID, data)
 	if err != nil {
 		fmt.Printf("Error updating file_stats: %v\n", err)
 		return nil, err
