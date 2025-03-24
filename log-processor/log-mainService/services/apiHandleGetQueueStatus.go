@@ -36,6 +36,13 @@ type QueueInfo struct {
 	Failed    int `json:"failed"`
 }
 
+/******************************************************************************
+* FUNCTION:        HandleGetQueueCurrentStatus
+*
+* DESCRIPTION:     This function gets the current asynq queue status
+* INPUT:					 gin context
+* RETURNS:         void
+******************************************************************************/
 func HandleGetQueueCurrentStatus(ctx *gin.Context) {
 	var (
 		err       error

@@ -15,6 +15,13 @@ import (
 	"github.com/google/martian/log"
 )
 
+/******************************************************************************
+* FUNCTION:        HandleGetStatsByJobId
+*
+* DESCRIPTION:     This function gets log_stats by job id
+* INPUT:					 gin context
+* RETURNS:         void
+******************************************************************************/
 func HandleGetStatsByJobId(ctx *gin.Context) {
 	var (
 		jobId        string

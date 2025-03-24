@@ -92,17 +92,25 @@ func HandleUploadFileToQueue(ctx *gin.Context) {
 		"user_id":      userId,
 	}
 
+	dbConn := types.Db.DbConn
+	tx, _ := dbConn.Begin()
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			log.Errorf("panic occurred: %v", p)
+		} else if err != nil {
+			tx.Rollback()
+		} else {
+			tx.Commit()
+		}
+	}()
+
 	fileId, err = db.InsertAndReturnID("file_stats", data)
 	if err != nil {
 		log.Errorf("failed to insert into file_stats; err: %v", err)
 		SendResponse(ctx, http.StatusInternalServerError, "internal server error", "", 0)
 		return
 	}
-
-	// filePath = "log-files-storage/logs_1.txt"
-	// userId = "510206b0-51aa-44c5-8dc8-8fa0796a6766"
-	// fileId = 2
-	// fileSize = 965
 
 	task, _ := tasks.NewLogProcessTask(filePath, userId, fileId, fileSize)
 	taskInfo, err := types.AsynqClient.AsynqClient.Enqueue(task)
@@ -112,12 +120,15 @@ func HandleUploadFileToQueue(ctx *gin.Context) {
 		return
 	}
 
-	_, updateErr := db.UpdateDataInDB("UPDATE file_stats SET job_id = $1 WHERE file_id = $2", []interface{}{taskInfo.ID, fileId})
-	if updateErr != nil {
-		log.Errorf("failed to update job_id; err: %v", updateErr)
+	_, err = db.UpdateDataInDB("UPDATE file_stats SET job_id = $1 WHERE file_id = $2", []interface{}{taskInfo.ID, fileId})
+	if err != nil {
+		log.Errorf("failed to update job_id; err: %v", err)
 		SendResponse(ctx, http.StatusBadRequest, "internal server error", "", 0)
 		return
 	}
 
+	data["file_id"] = fileId
+	data["job_id"] = taskInfo.ID
+	BroadcastMessage(data, "log-table-update", userId)
 	SendResponse(ctx, http.StatusOK, "File uploaded successfully", filePath, 1)
 }

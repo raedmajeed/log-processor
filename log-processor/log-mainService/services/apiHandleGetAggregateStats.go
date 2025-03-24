@@ -14,6 +14,13 @@ import (
 	"github.com/google/martian/log"
 )
 
+/******************************************************************************
+* FUNCTION:        HandleGetAggregatedTasks
+*
+* DESCRIPTION:     This function is used query file_stats table
+* INPUT:					 gin context
+* RETURNS:         void
+******************************************************************************/
 func HandleGetAggregatedTasks(ctx *gin.Context) {
 	var (
 		err          error

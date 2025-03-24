@@ -87,15 +87,17 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 
 	taskInfo, inspErr := inspector.GetTaskInfo(queueName, taskID)
 	if inspErr == nil && taskInfo.Retried < 1 {
-		BroadcastMessage(fmt.Sprintf("Job %s active", taskID))
+		BroadcastMessage(fmt.Sprintf("Job %s active", taskID), "job-update", pay.UserId)
 	}
 
 	defer func() {
 		if err != nil {
 			if inspErr == nil && taskInfo.Retried == (taskInfo.MaxRetry-1) {
-				BroadcastMessage(fmt.Sprintf("Job %s failed", taskID))
-				updateFileStats(pay.FileId, "Failed", startTime, 0,
+				BroadcastMessage(fmt.Sprintf("Job %s failed", taskID), "job-update", pay.UserId)
+				data, _ := updateFileStats(pay.FileId, "Failed", startTime, 0,
 					fmt.Sprintf("task permanently failed after max retries: %v", err))
+				data["file_id"] = pay.FileId
+				BroadcastMessage(data, "log-table-update", pay.UserId)
 				//! delete file from supabase
 			}
 		}
@@ -136,8 +138,10 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 	}
 
 	keywordJSON, _ := json.Marshal(logStats.KeywordCounts)
-	updateFileStats(pay.FileId, "Completed", startTime, logStats.ErrorCount, "", string(keywordJSON))
-	BroadcastMessage(fmt.Sprintf("Job %s completed", taskID))
+	data, _ := updateFileStats(pay.FileId, "Completed", startTime, logStats.ErrorCount, "", string(keywordJSON))
+	data["file_id"] = pay.FileId
+	BroadcastMessage(data, "log-table-update", pay.UserId)
+	BroadcastMessage(fmt.Sprintf("Job %s completed", taskID), "job-update", pay.UserId)
 
 	return nil
 }
@@ -463,7 +467,7 @@ func processFileChunk(file *os.File, chunk FileChunk, fileID int64) ([]LogEntry,
 * INPUT:           fileID, status, startTime, errorCount, failureReason, keywordJSON
 * RETURNS:         error
 ******************************************************************************/
-func updateFileStats(fileID int64, status string, startTime time.Time, errorCount int, failureReason string, keywordJSON ...string) error {
+func updateFileStats(fileID int64, status string, startTime time.Time, errorCount int, failureReason string, keywordJSON ...string) (map[string]interface{}, error) {
 	endTime := time.Now()
 	processingTimeSec := endTime.Sub(startTime).Seconds()
 
@@ -486,8 +490,8 @@ func updateFileStats(fileID int64, status string, startTime time.Time, errorCoun
 	err := db.UpdateSingleRecord("file_stats", "file_id", fileID, data)
 	if err != nil {
 		fmt.Printf("Error updating file_stats: %v\n", err)
-		return err
+		return nil, err
 	}
 
-	return nil
+	return data, nil
 }
