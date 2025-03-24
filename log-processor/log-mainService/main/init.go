@@ -16,28 +16,44 @@ const (
 
 var apiRoutes = types.ApiRoutes{
 	{
-		Method:    "GET",
-		Pattern:   "/upload-logs",
-		Handler:   services.HandleUploadFileToQueue,
-		IsAuthReq: true,
+		Method:           "GET",
+		Pattern:          "/upload-logs",
+		Handler:          services.HandleUploadFileToQueue,
+		IsAuthReq:        true,
+		UseRateLimit:     true,
+		RateLimitPerSec:  1,
+		RateLimitBurst:   2,
+		RateLimitMessage: "too many requests",
 	},
 	{
-		Method:    "GET",
-		Pattern:   "/queue-status",
-		Handler:   services.HandleGetQueueCurrentStatus,
-		IsAuthReq: false,
+		Method:           "GET",
+		Pattern:          "/queue-status",
+		Handler:          services.HandleGetQueueCurrentStatus,
+		IsAuthReq:        false,
+		UseRateLimit:     true,
+		RateLimitPerSec:  1,
+		RateLimitBurst:   2,
+		RateLimitMessage: "too many requests",
 	},
 	{
-		Method:    "GET",
-		Pattern:   "/stats",
-		Handler:   services.HandleGetAggregatedTasks,
-		IsAuthReq: true,
+		Method:           "GET",
+		Pattern:          "/stats",
+		Handler:          services.HandleGetAggregatedTasks,
+		IsAuthReq:        true,
+		UseRateLimit:     true,
+		RateLimitPerSec:  1,
+		RateLimitBurst:   2,
+		RateLimitMessage: "too many requests",
 	},
 	{
-		Method:    "GET",
-		Pattern:   "/stats/:jobId",
-		Handler:   services.HandleGetStatsByJobId,
-		IsAuthReq: true,
+		Method:           "GET",
+		Pattern:          "/stats/:jobId",
+		Handler:          services.HandleGetStatsByJobId,
+		IsAuthReq:        true,
+		UseRateLimit:     true,
+		RateLimitPerSec:  1,
+		RateLimitBurst:   2,
+		RateLimitMessage: "too many requests",
 	},
 	{
 		Method:    "GET",
@@ -58,6 +74,7 @@ func init() {
 		return
 	}
 	createAsynqRedisClient()
+	// InitInspector()
 }
 
 /******************************************************************************
@@ -99,6 +116,9 @@ func getEnv(key, defaultValue string) string {
 func createAsynqRedisClient() {
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: types.CmnGlblCfg.REDIS_ADDR})
 	types.AsynqClient.AsynqClient = asynqClient
+	if asynqClient == nil {
+		os.Exit(0)
+	}
 }
 
 /******************************************************************************
@@ -107,6 +127,9 @@ func createAsynqRedisClient() {
 * INPUT:           None
 * RETURNS:         VOID
 ******************************************************************************/
-func InitInspector(redisAddr string) {
-	types.AsynqClient.AsynqInspector = asynq.NewInspector(asynq.RedisClientOpt{Addr: redisAddr})
+func InitInspector() {
+	types.AsynqClient.AsynqInspector = asynq.NewInspector(asynq.RedisClientOpt{Addr: types.CmnGlblCfg.REDIS_ADDR})
+	if types.AsynqClient.AsynqInspector == nil {
+		os.Exit(0)
+	}
 }

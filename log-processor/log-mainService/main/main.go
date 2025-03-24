@@ -30,6 +30,7 @@ func main() {
 	go router.Run(":" + types.CmnGlblCfg.RUNNING_PORT)
 	go runMuxAsynqServer()
 	initRateLimitOptions()
+	InitInspector()
 
 	go signalHandler(sigChan)
 	err := <-types.ExitChan
@@ -55,25 +56,25 @@ func createNewRouter() *gin.Engine {
 	ipLimitOpts := types.IPRateLimitOptions{
 		ClientTimeout: 5 * time.Minute,
 	}
-	ipRateLimiter := services.NewRateLimiterMiddleware(rate.Limit(types.RateLimit.PerIPLimit), types.RateLimit.PerIPBurst, ipLimitOpts)
+	ipRateLimiter := services.NewRateLimiterMiddleware(rate.Limit(5), 10, ipLimitOpts)
 	r.Use(ipRateLimiter.RateLimit())
 
 	for _, route := range apiRoutes {
-		routeHandlers := []gin.HandlerFunc{}
+		// routeHandlers := []gin.HandlerFunc{}
 
 		if route.IsAuthReq {
 			r.Use(AuthMiddleware)
 		}
 
-		if route.UseRateLimit {
-			routeHandlers = append(routeHandlers, services.RouteSpecificRateLimit(
-				route.Pattern,
-				rate.Limit(route.RateLimitPerSec),
-				route.RateLimitBurst,
-			))
-		}
+		// if route.UseRateLimit {
+		// 	routeHandlers = append(routeHandlers, services.RouteSpecificRateLimit(
+		// 		route.Pattern,
+		// 		rate.Limit(route.RateLimitPerSec),
+		// 		route.RateLimitBurst,
+		// 	))
+		// }
 
-		routeHandlers = append(routeHandlers, route.Handler)
+		// routeHandlers = append(routeHandlers, route.Handler)
 
 		endpoint := baseUrl + route.Pattern
 		switch route.Method {

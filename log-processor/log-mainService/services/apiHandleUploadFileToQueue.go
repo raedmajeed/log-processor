@@ -13,6 +13,7 @@ import (
 	"LOGProcessor/shared/types"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -72,6 +73,10 @@ func HandleUploadFileToQueue(ctx *gin.Context) {
 
 	uploadRsp, err = uploadFileToSupeBaseStorage(token, fileName, file)
 	if err != nil {
+		if strings.Contains(err.Error(), "The resource already exists") {
+			SendResponse(ctx, http.StatusBadRequest, "file name already exists", "", 0)
+			return
+		}
 		log.Errorf("failed to upload to supabase; err: ", err)
 		SendResponse(ctx, http.StatusBadRequest, "internal server error", "", 0)
 		return

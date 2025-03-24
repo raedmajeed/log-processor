@@ -24,7 +24,9 @@ const (
 )
 
 var (
-	inspector = types.AsynqClient.AsynqInspector
+	logLineRegex = regexp.MustCompile(`\[(.*?)\]\s+(\w+)\s+(.*)`)
+	ipRegex      = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
+	keywordList  = ConvertToKeywordList(types.CmnGlblCfg.KEYWORD_CONFIG)
 )
 
 type FileChunk struct {
@@ -55,10 +57,6 @@ type LogStats struct {
 	ErrorCount    int
 }
 
-var logLineRegex = regexp.MustCompile(`\[(.*?)\]\s+(\w+)\s+(.*)`)
-var ipRegex = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
-var keywordList = ConvertToKeywordList(types.CmnGlblCfg.KEYWORD_CONFIG)
-
 /******************************************************************************
 * FUNCTION:        HandleUploadFileToQueue
 *
@@ -72,20 +70,19 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 		logStats      *LogStats
 		fileSizeBytes int64
 		queueName     string
-		errorMsg      string
+		inspector     = types.AsynqClient.AsynqInspector
 	)
 
 	payload := t.Payload()
 	var pay tasks.LogProcessPayload
 	json.Unmarshal(payload, &pay)
 	startTime := time.Now()
-
 	taskID := t.ResultWriter().TaskID()
 
 	if fileSizeBytes > 1073741824 {
-		queueName = "high"
-	} else {
 		queueName = "low"
+	} else {
+		queueName = "high"
 	}
 
 	taskInfo, inspErr := inspector.GetTaskInfo(queueName, taskID)
@@ -95,12 +92,12 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 
 	defer func() {
 		if err != nil {
-			taskInfo, inspErr := inspector.GetTaskInfo(queueName, taskID)
-			if inspErr == nil && taskInfo.Retried == 3 {
+			if inspErr == nil && taskInfo.Retried == (taskInfo.MaxRetry-1) {
+				BroadcastMessage(fmt.Sprintf("Job %s failed", taskID))
 				updateFileStats(pay.FileId, "Failed", startTime, 0,
-					fmt.Sprintf("task permanently failed after max retries: %v", errorMsg))
+					fmt.Sprintf("task permanently failed after max retries: %v", err))
+				//! delete file from supabase
 			}
-			BroadcastMessage(fmt.Sprintf("Job %s failed", taskID))
 		}
 	}()
 
@@ -113,7 +110,6 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
-			errorMsg = fmt.Sprintf("panic occurred during processing: %v", r)
 		} else if err != nil {
 			tx.Rollback()
 			log.Errorf("Transaction rolled back due to error: %v", err)
@@ -141,7 +137,6 @@ func HandleAsyncTaskMethod(ctx context.Context, t *asynq.Task) error {
 
 	keywordJSON, _ := json.Marshal(logStats.KeywordCounts)
 	updateFileStats(pay.FileId, "Completed", startTime, logStats.ErrorCount, "", string(keywordJSON))
-	fmt.Println("Log processing completed successfully", logStats)
 	BroadcastMessage(fmt.Sprintf("Job %s completed", taskID))
 
 	return nil
@@ -329,6 +324,7 @@ func processLargeLogFile(ctx context.Context, filePath string, fileID int64, fil
 	if err != nil {
 		return nil, fmt.Errorf("error downloading file: %v", err)
 	}
+	defer fileContent.Close()
 
 	tempFile, err := os.CreateTemp("", "log-processing-*")
 	if err != nil {

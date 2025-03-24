@@ -13,6 +13,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"time"
 
 	storage "github.com/supabase-community/storage-go"
 )
@@ -43,6 +44,10 @@ func uploadFileToSupeBaseStorage(authToken, fileName string, file multipart.File
 * RETURNS:         io.ReadCloser, err
 ******************************************************************************/
 func downloadFileFromSupeBaseStorage(filePath string) (io.ReadCloser, error) {
+	var (
+		err  error
+		resp *http.Response
+	)
 	token, err := JwtTokenCreatorForSupebaseStorage(filePath)
 	if err != nil {
 		return nil, err
@@ -51,9 +56,12 @@ func downloadFileFromSupeBaseStorage(filePath string) (io.ReadCloser, error) {
 	url := fmt.Sprintf("%s%s/object/sign/%s?token=%s",
 		types.CmnGlblCfg.SUPEBASE_API, types.CmnGlblCfg.SUPEBASE_STORAGE_BASE, filePath, token)
 
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
+	for i := 0; i < 3; i++ {
+		resp, err = http.Get(url)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			return resp.Body, nil
+		}
+		time.Sleep(time.Second)
 	}
 
 	if resp.StatusCode != http.StatusOK {

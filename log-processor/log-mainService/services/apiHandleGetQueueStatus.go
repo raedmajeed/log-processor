@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/martian/log"
 	"github.com/hibiken/asynq"
 )
 
@@ -49,14 +50,12 @@ func HandleGetQueueCurrentStatus(ctx *gin.Context) {
 
 	highQueueStats, err := getQueueStats(timeoutCtx, inspector, "high")
 	if err != nil {
-		SendResponse(ctx, http.StatusInternalServerError, fmt.Sprintf("Failed to get high queue stats: %v", err), "", 0)
-		return
+		log.Infof("high queue does not exists")
 	}
 
 	lowQueueStats, err := getQueueStats(timeoutCtx, inspector, "low")
 	if err != nil {
-		SendResponse(ctx, http.StatusInternalServerError, fmt.Sprintf("Failed to get low queue stats: %v", err), "", 0)
-		return
+		log.Infof("low queue does not exists")
 	}
 
 	totalStats := QueueInfo{
@@ -68,21 +67,15 @@ func HandleGetQueueCurrentStatus(ctx *gin.Context) {
 		Failed:    highQueueStats.Failed + lowQueueStats.Failed,
 	}
 
-	queueStatus := QueueResp{
-		HighQueue: highQueueStats,
-		LowQueue:  lowQueueStats,
-		Total:     totalStats,
-	}
-
 	activeTasks, err := getActiveTasks(inspector)
 	if err == nil && len(activeTasks) > 0 {
 		responseData := map[string]interface{}{
-			"queue_status": queueStatus,
+			"queue_status": totalStats,
 			"active_tasks": activeTasks,
 		}
 		SendResponse(ctx, http.StatusOK, "Queue status fetched successfully", responseData, 1)
 	} else {
-		SendResponse(ctx, http.StatusOK, "Queue status fetched successfully", queueStatus, 1)
+		SendResponse(ctx, http.StatusOK, "Queue status fetched successfully", totalStats, 1)
 	}
 
 }
