@@ -27,7 +27,6 @@ const (
 var (
 	logLineRegex = regexp.MustCompile(`\[(.*?)\]\s+(\w+)\s+(.*)`)
 	ipRegex      = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
-	keywordList  = ConvertToKeywordList(types.CmnGlblCfg.KEYWORD_CONFIG)
 )
 
 type FileChunk struct {
@@ -260,6 +259,7 @@ func parseLogLine(line string, fileID int64) (LogEntry, bool) {
 	}
 
 	keywordDetected := ""
+	keywordList := ConvertToKeywordList(types.CmnGlblCfg.KEYWORD_CONFIG)
 	messageLower := strings.ToLower(message)
 	for _, keyword := range keywordList {
 		if strings.Contains(messageLower, keyword) {
