@@ -2,6 +2,8 @@
 
 Log Processor is a microservice-based log management solution using Golang, Asynq, Supabase, and Redis. It supports log processing, queue management, and real-time data aggregation.
 
+![process architecture](arch_overview.png)
+
 ## Features
 
 - Asynchronous log processing using Asynq
