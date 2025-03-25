@@ -10,14 +10,10 @@ import (
 )
 
 type ServiceApiRoute struct {
-	Method           string
-	Pattern          string
-	Handler          gin.HandlerFunc
-	IsAuthReq        bool
-	UseRateLimit     bool
-	RateLimitPerSec  float64
-	RateLimitBurst   int
-	RateLimitMessage string
+	Method    string
+	Pattern   string
+	Handler   gin.HandlerFunc
+	IsAuthReq bool
 }
 
 type Data interface {

@@ -7,7 +7,7 @@ function moduleInit()
 
 function make_all() 
 {
-  echo "Building the project..."
+  echo "Building the project"
 	cd $AppRoot/build
 	make -f Makefile
 	cd -

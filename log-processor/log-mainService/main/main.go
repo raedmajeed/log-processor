@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"github.com/google/martian/log"
 	"github.com/hibiken/asynq"
 	"golang.org/x/time/rate"
 )
@@ -35,8 +36,7 @@ func main() {
 	go signalHandler(sigChan)
 	err := <-types.ExitChan
 
-	// !REPLACE WITH LOGGER HERE
-	fmt.Println("error", err)
+	log.Errorf("error", err.Error())
 }
 
 /******************************************************************************
@@ -60,21 +60,10 @@ func createNewRouter() *gin.Engine {
 	r.Use(ipRateLimiter.RateLimit())
 
 	for _, route := range apiRoutes {
-		// routeHandlers := []gin.HandlerFunc{}
 
 		if route.IsAuthReq {
 			r.Use(AuthMiddleware)
 		}
-
-		// if route.UseRateLimit {
-		// 	routeHandlers = append(routeHandlers, services.RouteSpecificRateLimit(
-		// 		route.Pattern,
-		// 		rate.Limit(route.RateLimitPerSec),
-		// 		route.RateLimitBurst,
-		// 	))
-		// }
-
-		// routeHandlers = append(routeHandlers, route.Handler)
 
 		endpoint := baseUrl + route.Pattern
 		switch route.Method {
@@ -193,11 +182,5 @@ func initRateLimitOptions() {
 		GlobalBurst: 200,
 		PerIPLimit:  10,
 		PerIPBurst:  20,
-		PerRouteOpts: map[string]types.PerRouteLimit{
-			"/upload-logs": {
-				Limit: 5,
-				Burst: 10,
-			},
-		},
 	}
 }
