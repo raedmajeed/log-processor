@@ -20,10 +20,18 @@ import (
 * FUNCTION:        HandleGetStatsByJobId
 *
 * DESCRIPTION:     This function gets log_stats by job id
+*									 The thing to not is, here the pagination should happen incrementally
+*									 the reason being paginating with offset can be very expensive and time consuming
+*									 for very large files, which is expected from a logging service.
+*									 Hence to optimize querying I take an approach by filtering with
+*									 the last id, thereby resulting in a faster output
+*
 * INPUT:					 gin context
 * RETURNS:         void
 ******************************************************************************/
 func HandleGetStatsByJobId(ctx *gin.Context) {
+	PanicRecovery("HandleGetStatsByJobId")
+
 	var (
 		jobId        string
 		err          error
