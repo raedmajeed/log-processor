@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  service-log-main:
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile.log-mainService
+    image: log-main-service:v1
+    container_name: log-main-service
+    ports:
+      - "${MAIN_SERVICE_PORT}:8080"
+    env_file:
+      - ../.env
+    networks:
+      - log
+    depends_on:
+      - redis
+      - postgres  # Add dependency
+
+  redis:
+    restart: always
+    image: redis:latest
+    container_name: redis
+    networks:
+      - log
+    environment:
+      - TZ=Asia/Kolkata
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    restart: unless-stopped
+    networks:
+      - log
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+      TZ: Asia/Kolkata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT}:5432"  # Maps host's DB_PORT to container's 5432
+
+networks:
+  log:
+    name: log
+
+volumes:
+  postgres_data:  # Persistent storage for DB
