@@ -1,0 +1,14 @@
+FROM golang:1.24.1-bookworm
+
+WORKDIR /app
+
+# Copy only necessary files
+COPY ./log-mainService/bin/log-main-service.bin ./bin/
+COPY .env ./
+
+# Set executable permissions
+RUN chmod +x ./bin/log-main-service.bin
+
+# Runtime configuration
+# EXPOSE 8080
+CMD ["./bin/log-main-service.bin"]
