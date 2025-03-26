@@ -1,9 +1,9 @@
 package main
 
 import (
-	"LOGProcessor/log-mainService/services"
-	"LOGProcessor/shared/db"
-	"LOGProcessor/shared/types"
+	"log-mainService/services"
+	"shared/db"
+	"shared/types"
 	"os"
 
 	"github.com/hibiken/asynq"
@@ -91,8 +91,8 @@ func getEnv(key, defaultValue string) string {
 }
 
 /******************************************************************************
-* FUNCTION:        loadEnvVariables
-* DESCRIPTION:     Function to load env variables and assign to global variables
+* FUNCTION:        createAsynqRedisClient
+* DESCRIPTION:     Initializes a Asynq Redis Client
 * INPUT:           None
 * RETURNS:         VOID
 ******************************************************************************/
@@ -105,8 +105,8 @@ func createAsynqRedisClient() {
 }
 
 /******************************************************************************
-* FUNCTION:        loadEnvVariables
-* DESCRIPTION:     Function to load env variables and assign to global variables
+* FUNCTION:        InitInspector
+* DESCRIPTION:     Initializes  a new Asynq task inspector for queue monitoring
 * INPUT:           None
 * RETURNS:         VOID
 ******************************************************************************/

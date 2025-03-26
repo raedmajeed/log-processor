@@ -1,4 +1,4 @@
-SERVICE_PATH=${PWD}/../log-mainService/
+SERVICE_PATH=${PWD}/log-mainService/
 
 GOFMT=gofmt -w
 GOBUILD=go build -gcflags "-N -l" -v
@@ -24,4 +24,4 @@ all:
 
 docker:
 	@echo "Building log-mainService Docker Image"
-	docker build -f ../docker/Dockerfile-log-mainService -t log-main-service:v1 ..
+	docker build -f Dockerfile.log-mainService -t log-main-service:v1 ..

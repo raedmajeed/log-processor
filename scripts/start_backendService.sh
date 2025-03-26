@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd ../docker || exit 1
+cd .. || exit 1
 
 docker-compose down
 
