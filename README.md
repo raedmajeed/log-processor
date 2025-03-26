@@ -28,7 +28,7 @@ git clone https://github.com/your-repo/log-processor.git
 cd log-processor
 ```
 
-2. Set environment variables in `.env`.
+2. Rename `sample.env` to `.env` and enter your credentals
 3. Build and run using Docker:
 
 ```bash
